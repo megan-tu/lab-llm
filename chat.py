@@ -7,6 +7,12 @@ load_dotenv()  # reads variables from a .env file and sets them in os.environ
 # in python, class names are CamelCase
 # non-class names (functions/variables) are in snake_case
 class Chat:
+    '''
+    >>> chat = Chat()
+    >>> chat.send_message('my name is bob', temperature=0.0)
+    'Arrr, ye be Bob, eh? Yer name be known to me now, matey.'
+    >>> chat.send_message('what is my name?, temperature=0.0)
+    '''
     client = Groq()
     def __init__(self):
         self.messages = [
@@ -27,6 +33,7 @@ class Chat:
         chat_completion = self.client.chat.completions.create(
             messages=self.messages,
             model="llama-3.1-8b-instant",
+            temperature=temperature,
         )
         result = chat_completion.choices[0].message.content
         self.messages.append({

@@ -8,10 +8,27 @@ load_dotenv()  # reads variables from a .env file and sets them in os.environ
 # non-class names (functions/variables) are in snake_case
 class Chat:
     '''
+    >>> def monkey_input(prompt, user_inputs=['Hello, I am monkey.', 'Goodbye.']):
+    ...     try:
+    ...         user_input = user_inputs.pop(0)
+    ...         print(f'{prompt}{user_input}')
+    ...         return user_input
+    ...     except IndexError:
+    ...         raise KeyboardInterrupt
+    >>> import builtins
+    >>> builtins.input = monkey_input
+    >>> repl(temperature=0.0)
+    chat> Hello, I am monkey.
+    Arrr, ye be a mischievous little monkey, eh? Yer chatterin' be music to me ears, matey!
+    chat> Goodbye.
+    Farewell, me scurvy monkey friend, may the winds o' fortune blow in yer favor!
+    <BLANKLINE>
+
     >>> chat = Chat()
     >>> chat.send_message('my name is bob', temperature=0.0)
     'Arrr, ye be Bob, eh? Yer name be known to me now, matey.'
-    >>> chat.send_message('what is my name?, temperature=0.0)
+    >>> chat.send_message('what is my name?', temperature=0.0)
+    "Ye be askin' about yer own name, eh? Yer name be... Bob, matey!"
     '''
     client = Groq()
     def __init__(self):
@@ -22,7 +39,7 @@ class Chat:
                     "content": "Write the output in 1-2 sentences. Talk like pirate."
                 },
             ]
-    def send_message(self, message):
+    def send_message(self, message, temperature=0.8):
         self.messages.append(
             {
                 # system: never changes; user: changes a lot;
@@ -42,15 +59,16 @@ class Chat:
         })
         return result
 
-
-if __name__ == '__main__':
+def repl(temperature=0.0):
     import readline
     chat = Chat()
     try:
         while True:
             user_input = input('chat> ')
-            response = chat.send_message(user_input)
+            response = chat.send_message(user_input, temperature=temperature)
             print(response)
     except KeyboardInterrupt:
         print()
-        pass
+
+if __name__ == '__main__':
+    repl(temperature=0.0)

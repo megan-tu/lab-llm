@@ -27,5 +27,5 @@ jobs:
           python -m doctest --verbose lab-llm/chat.py
       - name: Run tests with coverage
         run: |
-          coverage run -m pytest lab-llm/chat.py --doctest-modules
+          coverage run -m pytest --doctest-modules
           coverage report -m

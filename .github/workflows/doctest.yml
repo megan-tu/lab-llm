@@ -23,4 +23,4 @@ jobs:
           pip install -r requirements.txt
       - name: Run doctests
         run: |
-          python -m pytest --doctest-modules chat.py
+          python -m doctest --verbose lab-llm/chat.py

@@ -11,4 +11,4 @@ authors = [{ name = "Megan Tu", email = "mtu@students.pitzer.edu" }]
 requires-python = ">=3.9"
 
 [project.scripts]
-realchatpython = "chat:repl"
+chat = "chat:repl"

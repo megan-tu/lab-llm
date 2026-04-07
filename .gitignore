@@ -4,5 +4,6 @@ __pycache__
 docsum/.coverage
 .pytest_cache
 dist/
-c
-mc_csci040_MeganTu.egg-info/
+cmc_csci040_MeganTu.egg-info/
+build/lib/
+.coverage

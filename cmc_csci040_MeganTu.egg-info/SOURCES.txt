@@ -1,8 +1,0 @@
-README.md
-chat.py
-pyproject.toml
-cmc_csci040_MeganTu.egg-info/PKG-INFO
-cmc_csci040_MeganTu.egg-info/SOURCES.txt
-cmc_csci040_MeganTu.egg-info/dependency_links.txt
-cmc_csci040_MeganTu.egg-info/entry_points.txt
-cmc_csci040_MeganTu.egg-info/top_level.txt

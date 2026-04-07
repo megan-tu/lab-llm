@@ -3,3 +3,6 @@ venv
 __pycache__
 docsum/.coverage
 .pytest_cache
+dist/
+c
+mc_csci040_MeganTu.egg-info/

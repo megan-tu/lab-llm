@@ -9,6 +9,10 @@ description = "An LLM in python that chats like a pirate using a GROQ API key."
 readme = "README.md"
 authors = [{ name = "Megan Tu", email = "mtu@students.pitzer.edu" }]
 requires-python = ">=3.9"
+dependencies = [
+    "groq",
+    "python-dotenv",
+]
 
 [project.scripts]
 chat = "chat:repl"

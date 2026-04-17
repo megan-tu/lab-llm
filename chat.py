@@ -1,45 +1,130 @@
+import json
 import os
 from groq import Groq
+from tools.calculate import calculate, tool_schema
+from tools.ls import ls, tool_schema
+from tools.cat import cat, tool_schema
+from tools.grep import grep, tool_schema
 
 from dotenv import load_dotenv
 load_dotenv()  # reads variables from a .env file and sets them in os.environ
+
 
 # in python, class names are CamelCase
 # non-class names (functions/variables) are in snake_case
 class Chat:
     '''
-    >>> def monkey_input(prompt, user_inputs=['Hello, I am monkey.', 'Goodbye.']):
-    ...     try:
-    ...         user_input = user_inputs.pop(0)
-    ...         print(f'{prompt}{user_input}')
-    ...         return user_input
-    ...     except IndexError:
-    ...         raise KeyboardInterrupt
-    >>> import builtins
-    >>> builtins.input = monkey_input
-    >>> repl(temperature=0.0)
-    chat> Hello, I am monkey.
-    Arrr, ye be a mischievous little monkey, eh? Yer chatterin' be music to me ears, matey!
-    chat> Goodbye.
-    Farewell, me scurvy monkey friend, may the winds o' fortune blow in yer favor!
-    <BLANKLINE>
+    The Chat class sends messages to an LLM and talks like a pirate. It also support tool calling,
+    including ls, cat, grep, and calculate.
 
     >>> chat = Chat()
-    >>> chat.send_message('my name is bob', temperature=0.0)
-    'Arrr, ye be Bob, eh? Yer name be known to me now, matey.'
-    >>> chat.send_message('what is my name?', temperature=0.0)
-    "Ye be askin' about yer own name, eh? Yer name be... Bob, matey!"
+    >>> chat.send_message("hello")
+    "Ahoy, matey! What be ye needin' on this fine day? Arr!"
+    
+
+    
+    Tool Function Doctests:
+    >>> chat = Chat()
+    >>> calculate('238942 * 109347134')
+    '{"result": 26127622892228}'
+    >>> calculate('1/0')
+    '{"error": "Invalid expression"}'
+
+    >>> cat('.coverage')
+    'UnicodeDecodeError'
+    >>> cat('tool.py')
+    'FileNotFoundError'
+    >>> cat('..')
+    'Error: unsafe path'
+
+    >>> ls('')
+    'README.md __pycache__ build chat.py cmc_csci040_MeganTu.egg-info dist htmlcov pyproject.toml requirements.txt test_projects tools venv'
+    
+    >>> ls('tools')
+    'tools/__pycache__ tools/calculate.py tools/cat.py tools/grep.py tools/ls.py tools/util.py'
+
+    >>> ls('..')
+    'Error: unsafe path'
+    >>> ls('/Users/megantu/CSCI040/docsum')
+    'Error: unsafe path'
+
+    >>> grep('*/ls.py', '[z]')
+    ''
+    >>> grep('..None', '[z]')
+    'Error: unsafe path'
     '''
     client = Groq()
     def __init__(self):
+        '''
+        Initializes the chat with default system prompt and tool definitions.
+        '''
+        self.MODEL = 'openai/gpt-oss-120b'
         self.messages = [
                 {
                     # most important content for sys prompt is length of response
                     "role": "system",
-                    "content": "Write the output in 1-2 sentences. Talk like pirate."
+                    "content": "Talk like pirate. Always use tools to complete tasks and return the output exactly."
                 },
             ]
-    def send_message(self, message, temperature=0.8):
+    def send_message(self, message, temperature=0.0):
+        '''
+        Sends a message to the LLM and returns the assistant's response.
+        
+        >>> import json
+        
+        >>> chat = Chat()
+
+        >>> class FakeToolCall:
+        ...     def __init__(self):
+        ...         self.function = type('Func', (), {
+        ...             "name": "calculate",
+        ...             "arguments": json.dumps({"expression": "123+456"})
+        ...         })()
+        ...         self.id = "1"
+
+        >>> class FakeMessage:
+        ...     def __init__(self, tool_calls=None, content=None):
+        ...         self.tool_calls = tool_calls
+        ...         self.content = content
+
+        >>> class FakeResponse:
+        ...     def __init__(self, message):
+        ...         self.choices = [type("Choice", (), {"message": message})()]
+
+        >>> def fake_create_first(*args, **kwargs):
+        ...     return FakeResponse(FakeMessage(tool_calls=[FakeToolCall()]))
+
+        >>> def fake_create_second(*args, **kwargs):
+        ...     return FakeResponse(FakeMessage(content="Arr, the answer be 579."))
+
+        >>> calls = [fake_create_first, fake_create_second]
+
+        >>> def fake_create(*args, **kwargs):
+        ...     return calls.pop(0)(*args, **kwargs)
+
+        >>> chat.client.chat.completions.create = fake_create
+
+        >>> result = chat.send_message("123+456")
+        >>> "579" in result
+        True
+
+        >>> chat = Chat()
+
+        >>> class FakeMessage:
+        ...     def __init__(self):
+        ...         self.tool_calls = None
+        ...         self.content = "Arr, no tools needed!"
+
+        >>> class FakeResponse:
+        ...     def __init__(self):
+        ...         self.choices = [type("Choice", (), {"message": FakeMessage()})()]
+
+        >>> chat.client.chat.completions.create = lambda *a, **k: FakeResponse()
+
+        >>> result = chat.send_message("hello")
+        >>> "no tools" in result.lower()
+        True
+        '''
         self.messages.append(
             {
                 # system: never changes; user: changes a lot;
@@ -47,24 +132,136 @@ class Chat:
                 'content': message
             }
         )
+
+        tools = [tool_schema]
+
         chat_completion = self.client.chat.completions.create(
             messages=self.messages,
-            model="llama-3.1-8b-instant",
+            #model="llama-3.1-8b-instant",
+            model=self.MODEL,
             temperature=temperature,
+            seed=0,
+            tools=tools,
+            tool_choice="auto",
         )
-        result = chat_completion.choices[0].message.content
-        self.messages.append({
-            'role': 'assistant',
-            'content': result,
-        })
+        
+        response_message = chat_completion.choices[0].message
+        tool_calls = response_message.tool_calls
+    
+        if tool_calls:
+            available_functions = {
+            "calculate": calculate,
+            "ls": ls,
+            "cat": cat,
+            "grep": grep,
+        }
+            self.messages.append(response_message)
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+                function_to_call = available_functions[function_name]
+                function_response = function_to_call(**function_args)
+
+                self.messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": function_response,
+                })
+            
+            # Step 4: Get final response from model
+            second_response = self.client.chat.completions.create(
+                    model=self.MODEL,
+                    messages=self.messages,
+                    tools=tools,
+                    tool_choice="auto",
+                )
+            result = second_response.choices[0].message.content
+            self.messages.append({
+                'role': 'assistant',
+                'content': result,
+            })
+    
+        else:
+            result = chat_completion.choices[0].message.content
+            self.messages.append({
+                'role': 'assistant',
+                'content': result,
+            })
         return result
 
 def repl(temperature=0.0):
+    '''
+    Runs an interactive REPL supporting slash commands and LLM chat.
+    Slash commands (/ls, /cat, /grep) can be executed directly without calling the LLM.
+
+    >>> from unittest.mock import patch
+    >>> def monkey_input(prompt, user_inputs=['Hi','/ls .github', '/cat tool.py', '/grep */calculate.py x.*n', '/unknown']):
+    ...     try:
+    ...         user_input = user_inputs.pop(0)
+    ...         print(f'{prompt}{user_input}')
+    ...         return user_input
+    ...     except IndexError:
+    ...         raise KeyboardInterrupt
+    >>> with patch('builtins.input', monkey_input), patch('chat.Chat') as MockChat:
+    ...     MockChat.return_value.send_message.return_value = 'Hello!'
+    ...     repl()
+    chat> Hi
+    Hello!
+    chat> /ls .github
+    .github/workflows
+    chat> /cat tool.py
+    FileNotFoundError
+    chat> /grep */calculate.py x.*n
+    def calculate(expression):
+        Evaluate a mathematical expression
+        '{"error": "Invalid expression"}'
+        '{"error": "Invalid expression"}'
+            result = eval(expression)  # Use safe evaluation in production
+        except Exception:
+            return json.dumps({"error": "Invalid expression"})
+                    "description": "Evaluate a mathematical expression",
+                            "expression": {
+                                "description": "The mathematical expression to evaluate",
+                        "required": ["expression"],
+    <BLANKLINE>
+    chat> /unknown
+    Error: unknown command unknown
+    <BLANKLINE>
+    '''
     import readline
     chat = Chat()
     try:
         while True:
             user_input = input('chat> ')
+            if user_input.startswith('/'):
+                parts = user_input[1:].split()
+                command = parts[0]
+                args = parts[1:]
+
+                if command == 'ls':
+                    result = ls(*args)
+                    print(result)
+                    chat.messages.append({
+                        "role": "system",
+                        "content": f'ls output: {result}'
+                    })
+                    continue
+
+                elif command == 'cat':
+                    output = cat(*args)
+                    print(output)
+                    continue
+
+                elif command =='grep':
+                    output = grep(*args)
+                    print(output)
+                    continue
+
+                else:
+                    print(f'Error: unknown command {command}')
+                    continue
+
             response = chat.send_message(user_input, temperature=temperature)
             print(response)
     except (KeyboardInterrupt, EOFError):
